@@ -136,6 +136,12 @@ export function RaffleProvider({ children }: { children: React.ReactNode }) {
     return () => clearInterval(id)
   }, [nextSpinTs])
 
+  // immediately sync countdown when ts updates
+  useEffect(() => {
+    if (nextSpinTs === null) return
+    setCountdown(Math.max(0, Math.floor((nextSpinTs - Date.now()) / 1000)))
+  }, [nextSpinTs])
+
   async function refreshEntrants() {
     try {
       const { entrants } = await getJSON<{ entrants: string[] }>('/api/entrants')
