@@ -7,7 +7,13 @@ const KEY = 'winners:list'
 
 export async function GET() {
   const raw = await redis.lrange(KEY, 0, -1)
-  const winners = raw.map((w) => JSON.parse(w) as any)
+  const winners = raw.flatMap((w) => {
+    try {
+      return [JSON.parse(w)]
+    } catch {
+      return []
+    }
+  })
   return NextResponse.json({ winners })
 }
 
