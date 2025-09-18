@@ -16,7 +16,8 @@ type Settings = typeof defaults
 export async function GET() {
   const raw = await redis.hgetall(KEY)
   const stored = raw as Record<string, string>
-  const timerSec = Number(stored.timerSec ?? defaults.timerSec)
+  const timerSecRaw = Number(stored.timerSec)
+  const timerSec = Number.isFinite(timerSecRaw) && timerSecRaw > 0 ? timerSecRaw : defaults.timerSec
   const settings: Settings = { ...defaults, ...stored, timerSec }
   // ensure global timestamp exists
   const initTs = Date.now() + timerSec * 1000
