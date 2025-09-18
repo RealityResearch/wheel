@@ -58,6 +58,7 @@ export interface RaffleState {
   triggerSpin: () => void
   recordWinner: (slotIdx: number) => void
   setSpinning: (v: boolean) => void
+  updateNextSpinTs: (ts: number) => void
 }
 
 const defaultSettings: Settings = {
@@ -235,13 +236,13 @@ export function RaffleProvider({ children }: { children: React.ReactNode }) {
         setSettings,
         recordWinner,
         autoSpin,
-        updateNextSpinTs,
         interval: intervalSec,
         countdown,
         registerSpin,
         triggerSpin,
         spinning,
         setSpinning,
+        updateNextSpinTs,
       }}
     >
       {children}
