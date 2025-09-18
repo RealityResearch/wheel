@@ -23,7 +23,7 @@ export async function POST(req: Request) {
   if (first === 0) return NextResponse.json({ ok: true }) // already processed
   await redis.expire(doneKey, 600)
 
-  const entrants = await redis.smembers<string>(ENT_KEY)
+  const entrants = (await redis.smembers(ENT_KEY)) as string[]
   if (entrants.length === 0) return NextResponse.json({ ok: true })
 
   const idx = Number(BigInt('0x' + randomness) % BigInt(entrants.length))

@@ -14,7 +14,8 @@ const defaults = {
 type Settings = typeof defaults
 
 export async function GET() {
-  const stored = await redis.hgetall<string>(KEY)
+  const raw = await redis.hgetall(KEY)
+  const stored = raw as Record<string, string>
   const settings: Settings = { ...defaults, ...stored, timerSec: Number(stored.timerSec ?? defaults.timerSec) }
   return NextResponse.json({ settings })
 }

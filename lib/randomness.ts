@@ -1,5 +1,8 @@
 import { Keypair, Connection } from '@solana/web3.js'
-import OnDemandClient from '@switchboard-xyz/on-demand'
+// Dynamic import to avoid TS export mismatch during build
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+// @ts-ignore
+const { OnDemandClient } = require('@switchboard-xyz/on-demand')
 import bs58 from 'bs58'
 
 const RPC = process.env.SB_ONDEMAND_RPC!

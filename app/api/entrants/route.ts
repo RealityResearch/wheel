@@ -61,11 +61,12 @@ const SAMPLE_WALLETS = [
 
 export async function GET() {
   // fetch entrants
-  let members = await redis.smembers<string>(KEY)
+  const membersRaw = await redis.smembers(KEY)
+  let members = membersRaw as string[]
 
   // dev seed once if empty
   if (members.length === 0 && process.env.NODE_ENV !== 'production') {
-    await redis.sadd(KEY, ...SAMPLE_WALLETS)
+    for (const w of SAMPLE_WALLETS) await redis.sadd(KEY, w)
     members = [...SAMPLE_WALLETS]
   }
 

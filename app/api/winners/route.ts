@@ -6,8 +6,9 @@ import { redis } from '@/lib/redis'
 const KEY = 'winners:list'
 
 export async function GET() {
-  const winners = await redis.lrange<string>(KEY, 0, -1)
-  return NextResponse.json({ winners: winners.map(JSON.parse) })
+  const raw = await redis.lrange(KEY, 0, -1)
+  const winners = raw.map((w) => JSON.parse(w) as any)
+  return NextResponse.json({ winners })
 }
 
 interface WinnerBody {
