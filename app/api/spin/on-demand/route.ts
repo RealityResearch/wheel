@@ -31,5 +31,8 @@ export async function POST(req: Request) {
   const record = { address: entrants[idx], round, ts: Date.now(), vrfTx: txSignature }
   await redis.lpush(WIN_KEY, JSON.stringify(record))
 
+  // schedule next spin 3 min later
+  await redis.set('nextSpinTs', Date.now() + 180000)
+
   return NextResponse.json({ ok: true })
 }

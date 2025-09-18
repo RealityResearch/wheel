@@ -17,7 +17,8 @@ export async function GET() {
   const raw = await redis.hgetall(KEY)
   const stored = raw as Record<string, string>
   const settings: Settings = { ...defaults, ...stored, timerSec: Number(stored.timerSec ?? defaults.timerSec) }
-  return NextResponse.json({ settings })
+  const nextSpinTs = Number(await redis.get('nextSpinTs')) || Date.now() + settings.interval * 1000 || Date.now() + 180000
+  return NextResponse.json({ settings, nextSpinTs })
 }
 
 export async function PATCH(req: Request) {

@@ -15,6 +15,10 @@ export async function POST() {
   const webhook = process.env.SB_ONDEMAND_WEBHOOK
   const { requestKey, txSignature } = await requestRandomness(webhook)
 
+  // schedule next spin timestamp
+  const intervalSec = 180
+  await redis.set('nextSpinTs', Date.now() + intervalSec * 1000)
+
   // store meta for later lookup (TTL 10 min)
   await redis.set(`${REQUEST_PREFIX}${requestKey}`, JSON.stringify({ txSignature }), { ex: 600 })
 

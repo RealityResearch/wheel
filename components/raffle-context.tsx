@@ -83,6 +83,7 @@ export function RaffleProvider({ children }: { children: React.ReactNode }) {
   const autoSpin = true
   const intervalSec = 180
   const [countdown, setCountdown] = useState(intervalSec)
+  const [nextSpinTs, setNextSpinTs] = useState<number>(() => Date.now() + intervalSec * 1000)
   const [spinning, setSpinning] = useState(false)
   const spinRef = useRef<() => void>()
   // countdown effect
@@ -93,9 +94,12 @@ export function RaffleProvider({ children }: { children: React.ReactNode }) {
       setCountdown(intervalSec)
       return
     }
-    const id = setTimeout(() => setCountdown(c => c - 1), 1000)
+    const id = setTimeout(() => {
+      const remaining = Math.floor((nextSpinTs - Date.now()) / 1000)
+      setCountdown(remaining)
+    }, 1000)
     return () => clearTimeout(id)
-  }, [autoSpin, countdown, intervalSec, spinning])
+  }, [autoSpin, countdown, intervalSec, spinning, nextSpinTs])
 
   // reset countdown when spin ends
   useEffect(() => {
@@ -118,30 +122,14 @@ export function RaffleProvider({ children }: { children: React.ReactNode }) {
     setCountdown(intervalSec)
   }
 
-  // initial fetch
+  // initial fetch state
   useEffect(() => {
     ;(async () => {
       try {
-        const [{ entrants }, { winners }, { settings }] = await Promise.all([
-          getJSON<{ entrants: string[] }>('/api/entrants'),
-          getJSON<{ winners: RaffleState['winners'] }>('/api/winners'),
-          getJSON<{ settings: Settings }>('/api/state')
-        ])
-
-        // fill slots + waitlist
-        setSlots(prev => {
-          const copy = [...prev]
-          entrants.slice(0, 50).forEach((addr, idx) => {
-            copy[idx] = { number: idx + 1, address: addr, color: FILLED_COLOR }
-          })
-          return copy
-        })
-        if (entrants.length > 50) setWaitlist(entrants.slice(50))
-        setWinners(winners)
-        setSettingsState(settings)
-      } catch (e) {
-        console.error('Failed to load initial state', e)
-      }
+        const { nextSpinTs } = await getJSON<{ nextSpinTs: number }>('/api/state')
+        setNextSpinTs(nextSpinTs)
+        setCountdown(Math.max(0, Math.floor((nextSpinTs - Date.now()) / 1000)))
+      } catch {}
     })()
   }, [])
 
