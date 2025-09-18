@@ -1,0 +1,250 @@
+'use client'
+
+import { createContext, useContext, useEffect, useState, useRef } from 'react'
+import { isValidSolanaAddress } from '@/lib/validateWallet'
+
+async function getJSON<T>(url: string): Promise<T> {
+  const res = await fetch(url, { cache: 'no-store' })
+  if (!res.ok) throw new Error('Request failed')
+  return res.json()
+}
+
+async function postJSON(url: string, body: any) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  })
+  if (!res.ok) throw new Error('Request failed')
+  return res.json()
+}
+
+async function patchJSON(url: string, body: any) {
+  const res = await fetch(url, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  })
+  if (!res.ok) throw new Error('Request failed')
+  return res.json()
+}
+
+interface Settings {
+  interval: number
+  autoSpin: boolean
+  tokenGate: boolean
+  mint: string
+}
+
+interface Slot {
+  number: number
+  address: string | null
+  color: string | null
+}
+
+export interface RaffleState {
+  slots: Slot[] // length 50
+  waitlist: string[]
+  winners: { round: number; address: string; timestamp: number; amount: number }[]
+  settings: Settings
+  autoSpin: boolean
+  interval: number
+  countdown: number
+  spinning: boolean
+  addEntrant: (address: string) => boolean
+  setSettings: (partial: Partial<Settings>) => void
+  // auto spin is fixed; no toggle or interval setter
+  registerSpin: (fn: () => void) => void
+  triggerSpin: () => void
+  recordWinner: (slotIdx: number) => void
+  setSpinning: (v: boolean) => void
+}
+
+const defaultSettings: Settings = {
+  interval: 180,
+  autoSpin: false,
+  tokenGate: false,
+  mint: ''
+}
+
+const RaffleContext = createContext<RaffleState | undefined>(undefined)
+
+// removed localStorage usage; source of truth is Redis via API
+
+const FILLED_COLOR = 'fill-[#79D297]'
+
+export function RaffleProvider({ children }: { children: React.ReactNode }) {
+  const [slots, setSlots] = useState<Slot[]>(() =>
+    Array.from({ length: 50 }).map((_, i) => ({ number: i + 1, address: null, color: null }))
+  )
+  const [waitlist, setWaitlist] = useState<string[]>([])
+  const [winners, setWinners] = useState<RaffleState['winners']>([])
+  const [settings, setSettingsState] = useState<Settings>(defaultSettings)
+  const autoSpin = true
+  const intervalSec = 180
+  const [countdown, setCountdown] = useState(intervalSec)
+  const [spinning, setSpinning] = useState(false)
+  const spinRef = useRef<() => void>()
+  // countdown effect
+  useEffect(() => {
+    if (!autoSpin || spinning) return
+    if (countdown === 0) {
+      spinRef.current?.()
+      setCountdown(intervalSec)
+      return
+    }
+    const id = setTimeout(() => setCountdown(c => c - 1), 1000)
+    return () => clearTimeout(id)
+  }, [autoSpin, countdown, intervalSec, spinning])
+
+  // reset countdown when spin ends
+  useEffect(() => {
+    if (!spinning) return
+    const id = setInterval(() => {
+      if (!spinning) {
+        setCountdown(intervalSec)
+        clearInterval(id)
+      }
+    }, 500)
+    return () => clearInterval(id)
+  }, [spinning, intervalSec])
+
+  function registerSpin(fn: () => void) {
+    spinRef.current = fn
+  }
+
+  function triggerSpin() {
+    spinRef.current?.()
+    setCountdown(intervalSec)
+  }
+
+  // initial fetch
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const [{ entrants }, { winners }, { settings }] = await Promise.all([
+          getJSON<{ entrants: string[] }>('/api/entrants'),
+          getJSON<{ winners: RaffleState['winners'] }>('/api/winners'),
+          getJSON<{ settings: Settings }>('/api/state')
+        ])
+
+        // fill slots + waitlist
+        setSlots(prev => {
+          const copy = [...prev]
+          entrants.slice(0, 50).forEach((addr, idx) => {
+            copy[idx] = { number: idx + 1, address: addr, color: FILLED_COLOR }
+          })
+          return copy
+        })
+        if (entrants.length > 50) setWaitlist(entrants.slice(50))
+        setWinners(winners)
+        setSettingsState(settings)
+      } catch (e) {
+        console.error('Failed to load initial state', e)
+      }
+    })()
+  }, [])
+
+  // polling for updates every 2s (simple)
+  useEffect(() => {
+    const id = setInterval(async () => {
+      try {
+        const { entrants } = await getJSON<{ entrants: string[] }>('/api/entrants')
+        setSlots(prev => {
+          const copy = [...prev]
+          entrants.slice(0, 50).forEach((addr, idx) => {
+            copy[idx] = { number: idx + 1, address: addr, color: FILLED_COLOR }
+          })
+          for (let i = entrants.length; i < 50; i++) copy[i] = { number: i + 1, address: null, color: null }
+          return copy
+        })
+        setWaitlist(entrants.slice(50))
+      } catch {}
+    }, 2000)
+    return () => clearInterval(id)
+  }, [])
+
+  // poll winners
+  useEffect(() => {
+    const id = setInterval(async () => {
+      try {
+        const { winners } = await getJSON<{ winners: RaffleState['winners'] }>('/api/winners')
+        setWinners(winners)
+      } catch {}
+    }, 2000)
+    return () => clearInterval(id)
+  }, [])
+
+  function addEntrant(address: string): boolean {
+    if (!isValidSolanaAddress(address)) return false
+    if (slots.some(s => s.address === address) || waitlist.includes(address)) return false
+
+    postJSON('/api/entrants', { address })
+      .then(() => {})
+      .catch(() => {})
+    return true
+  }
+
+  function setSettings(partial: Partial<Settings>) {
+    setSettingsState(prev => {
+      const next = { ...prev, ...partial }
+      patchJSON('/api/state', partial).catch(() => {})
+      return next
+    })
+  }
+
+  function recordWinner(slotIdx: number) {
+    setSlots(prev => {
+      const copy = [...prev]
+      const winnerSlot = copy[slotIdx]
+      if (winnerSlot.address) {
+        const newRecord = { round: winners.length + 1, address: winnerSlot.address!, timestamp: Date.now(), amount: 1 }
+        setWinners(w => [...w, newRecord])
+        postJSON('/api/winners', { address: winnerSlot.address!, round: newRecord.round })
+        // replace with waitlist first element or empty
+        if (waitlist.length > 0) {
+          const [next, ...rest] = waitlist
+          setWaitlist(rest)
+          copy[slotIdx] = {
+            number: winnerSlot.number,
+            address: next,
+            color: FILLED_COLOR
+          }
+        } else {
+          copy[slotIdx] = { number: winnerSlot.number, address: null, color: null }
+        }
+      }
+      return copy
+    })
+  }
+
+  return (
+    <RaffleContext.Provider
+      value={{
+        slots,
+        waitlist,
+        winners,
+        settings,
+        addEntrant,
+        setSettings,
+        recordWinner,
+        autoSpin,
+        interval: intervalSec,
+        countdown,
+        // auto spin is fixed; no toggle or interval setter
+        registerSpin,
+        triggerSpin,
+        spinning,
+        setSpinning,
+      }}
+    >
+      {children}
+    </RaffleContext.Provider>
+  )
+}
+
+export function useRaffle() {
+  const ctx = useContext(RaffleContext)
+  if (!ctx) throw new Error('useRaffle must be inside RaffleProvider')
+  return ctx
+}

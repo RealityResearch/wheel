@@ -1,0 +1,14 @@
+# dependencies
+/node_modules
+/.next
+/.turbo
+
+# env files
+.env.local
+.env.*.local
+
+# production
+/out
+
+# misc
+.DS_Store
