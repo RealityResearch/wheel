@@ -83,29 +83,15 @@ export function RaffleProvider({ children }: { children: React.ReactNode }) {
   const [settings, setSettingsState] = useState<Settings>(defaultSettings)
   const autoSpin = true
   const intervalSec = 180
-  const [countdown, setCountdown] = useState(intervalSec)
-  const [nextSpinTs, setNextSpinTs] = useState<number>(() => Date.now() + intervalSec * 1000)
-
-  function updateNextSpinTs(ts: number) {
-    setNextSpinTs(ts)
-    setCountdown(Math.max(0, Math.floor((ts - Date.now()) / 1000)))
-  }
+  const [nextSpinTs, setNextSpinTs] = useState<number | null>(null)
+  const [countdown, setCountdown] = useState(0)
   const [spinning, setSpinning] = useState(false)
   const spinRef = useRef<() => void>()
   // countdown effect
   useEffect(() => {
-    if (!autoSpin || spinning) return
-    if (countdown === 0) {
-      spinRef.current?.()
-      setCountdown(intervalSec)
-      return
-    }
-    const id = setTimeout(() => {
-      const remaining = Math.floor((nextSpinTs - Date.now()) / 1000)
-      setCountdown(remaining)
-    }, 1000)
-    return () => clearTimeout(id)
-  }, [autoSpin, countdown, intervalSec, spinning, nextSpinTs])
+    if (!autoSpin || spinning || nextSpinTs === null) return
+    if (countdown === 0) spinRef.current?.()
+  }, [autoSpin, countdown, spinning, nextSpinTs])
 
   // reset countdown when spin ends
   useEffect(() => {
@@ -128,24 +114,24 @@ export function RaffleProvider({ children }: { children: React.ReactNode }) {
     setCountdown(intervalSec)
   }
 
-  // initial fetch state
+  // initial fetch state and keep nextSpinTs in sync every 5s
   useEffect(() => {
-    ;(async () => {
+    const fetchTs = async () => {
       try {
         const { nextSpinTs } = await getJSON<{ nextSpinTs: number }>('/api/state')
         setNextSpinTs(nextSpinTs)
-        setCountdown(Math.max(0, Math.floor((nextSpinTs - Date.now()) / 1000)))
       } catch {}
-    })()
+    }
+    fetchTs()
+    const id = setInterval(fetchTs, 5000)
+    return () => clearInterval(id)
   }, [])
 
-  // global timer sync every second
+  // derive countdown every second
   useEffect(() => {
-    const id = setInterval(async () => {
-      try {
-        const { nextSpinTs: ts } = await getJSON<{ nextSpinTs: number }>('/api/state')
-        if (ts !== nextSpinTs) updateNextSpinTs(ts)
-      } catch {}
+    const id = setInterval(() => {
+      if (nextSpinTs === null) return
+      setCountdown(Math.max(0, Math.floor((nextSpinTs - Date.now()) / 1000)))
     }, 1000)
     return () => clearInterval(id)
   }, [nextSpinTs])
