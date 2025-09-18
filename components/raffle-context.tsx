@@ -84,6 +84,11 @@ export function RaffleProvider({ children }: { children: React.ReactNode }) {
   const intervalSec = 180
   const [countdown, setCountdown] = useState(intervalSec)
   const [nextSpinTs, setNextSpinTs] = useState<number>(() => Date.now() + intervalSec * 1000)
+
+  function updateNextSpinTs(ts: number) {
+    setNextSpinTs(ts)
+    setCountdown(Math.max(0, Math.floor((ts - Date.now()) / 1000)))
+  }
   const [spinning, setSpinning] = useState(false)
   const spinRef = useRef<() => void>()
   // countdown effect
@@ -230,6 +235,7 @@ export function RaffleProvider({ children }: { children: React.ReactNode }) {
         setSettings,
         recordWinner,
         autoSpin,
+        updateNextSpinTs,
         interval: intervalSec,
         countdown,
         registerSpin,
