@@ -20,8 +20,11 @@ export async function GET() {
   const settings: Settings = { ...defaults, ...stored, timerSec }
   // ensure global timestamp exists
   const initTs = Date.now() + timerSec * 1000
-  const nextSpinTsRaw = (await redis.get('nextSpinTs')) ?? (await redis.set('nextSpinTs', initTs).then(() => initTs.toString()))
-  const nextSpinTs = nextSpinTsRaw ? Number(nextSpinTsRaw) : Date.now() + timerSec * 1000
+  let nextSpinTs = Number(await redis.get('nextSpinTs'))
+  if (!nextSpinTs || nextSpinTs < Date.now()) {
+    nextSpinTs = initTs
+    await redis.set('nextSpinTs', nextSpinTs)
+  }
   return NextResponse.json({ settings, nextSpinTs })
 }
 
