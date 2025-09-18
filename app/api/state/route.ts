@@ -14,19 +14,26 @@ const defaults = {
 type Settings = typeof defaults
 
 export async function GET() {
-  const raw = await redis.hgetall(KEY)
-  const stored = raw as Record<string, string>
-  const timerSecRaw = Number(stored.timerSec)
-  const timerSec = Number.isFinite(timerSecRaw) && timerSecRaw > 0 ? timerSecRaw : defaults.timerSec
-  const settings: Settings = { ...defaults, ...stored, timerSec }
-  // ensure global timestamp exists
-  const initTs = Date.now() + timerSec * 1000
-  let nextSpinTs = Number(await redis.get('nextSpinTs'))
-  if (!Number.isFinite(nextSpinTs) || nextSpinTs < Date.now()) {
-    nextSpinTs = initTs
-    await redis.set('nextSpinTs', String(nextSpinTs))
+  try {
+    const raw = await redis.hgetall(KEY).catch(() => ({}))
+    const stored = (raw ?? {}) as Record<string, string>
+
+    const timerSecRaw = Number(stored.timerSec)
+    const timerSec = Number.isFinite(timerSecRaw) && timerSecRaw > 0 ? timerSecRaw : defaults.timerSec
+    const settings: Settings = { ...defaults, ...stored, timerSec }
+
+    const initTs = Date.now() + timerSec * 1000
+    let nextSpinTs = Number(await redis.get('nextSpinTs').catch(() => 0))
+    if (!Number.isFinite(nextSpinTs) || nextSpinTs < Date.now()) {
+      nextSpinTs = initTs
+      await redis.set('nextSpinTs', String(nextSpinTs))
+    }
+
+    return NextResponse.json({ settings, nextSpinTs })
+  } catch {
+    const nextSpinTs = Date.now() + defaults.timerSec * 1000
+    return NextResponse.json({ settings: defaults, nextSpinTs, error: 'state fallback' })
   }
-  return NextResponse.json({ settings, nextSpinTs })
 }
 
 export async function PATCH(req: Request) {
