@@ -139,6 +139,17 @@ export function RaffleProvider({ children }: { children: React.ReactNode }) {
     })()
   }, [])
 
+  // global timer sync every second
+  useEffect(() => {
+    const id = setInterval(async () => {
+      try {
+        const { nextSpinTs: ts } = await getJSON<{ nextSpinTs: number }>('/api/state')
+        if (ts !== nextSpinTs) updateNextSpinTs(ts)
+      } catch {}
+    }, 1000)
+    return () => clearInterval(id)
+  }, [nextSpinTs])
+
   async function refreshEntrants() {
     try {
       const { entrants } = await getJSON<{ entrants: string[] }>('/api/entrants')
