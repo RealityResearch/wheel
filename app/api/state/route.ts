@@ -18,7 +18,9 @@ export async function GET() {
   const stored = raw as Record<string, string>
   const timerSec = Number(stored.timerSec ?? defaults.timerSec)
   const settings: Settings = { ...defaults, ...stored, timerSec }
-  const nextSpinTsRaw = await redis.get('nextSpinTs')
+  // ensure global timestamp exists
+  const initTs = Date.now() + timerSec * 1000
+  const nextSpinTsRaw = (await redis.get('nextSpinTs')) ?? (await redis.set('nextSpinTs', initTs).then(() => initTs.toString()))
   const nextSpinTs = nextSpinTsRaw ? Number(nextSpinTsRaw) : Date.now() + timerSec * 1000
   return NextResponse.json({ settings, nextSpinTs })
 }
