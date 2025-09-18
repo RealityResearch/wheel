@@ -16,19 +16,11 @@ async function getClient() {
 }
 
 export async function requestRandomness(webhook?: string) {
-  if (process.env.NODE_ENV !== 'production') {
-    return { requestKey: crypto.randomUUID(), txSignature: 'dev-tx' } as any
-  }
   const client = await getClient()
   return client.requestRandomness({ webhookUrl: webhook })
 }
 
 export async function getRandomness(requestKey: string) {
-  if (process.env.NODE_ENV !== 'production') {
-    const buf = Buffer.alloc(4)
-    buf.writeUInt32BE(Math.floor(Math.random() * 2 ** 32))
-    return { randomness: buf, txSignature: 'dev-tx' } as any
-  }
   const client = await OnDemandClient.connect(new Connection(RPC, 'confirmed'))
   return client.getRandomness(requestKey)
 }

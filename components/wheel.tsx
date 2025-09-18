@@ -2,7 +2,7 @@
 
 import { motion, useAnimationControls } from 'framer-motion'
 import { useRaffle } from '@/components/raffle-context'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useRef } from 'react'
 
 async function postSpin() {
   const res = await fetch('/api/spin', { method: 'POST' })
@@ -33,7 +33,7 @@ function describeSlice(cx: number, cy: number, r: number, startAngle: number, en
 const SEGMENTS = 50
 
 export function Wheel() {
-  const { slots, recordWinner, registerSpin, setSpinning, spinning } = useRaffle()
+  const { slots, winners, recordWinner, registerSpin, setSpinning, spinning } = useRaffle()
   const [flashIdx, setFlashIdx] = useState<number | null>(null)
   const controls = useAnimationControls()
 
@@ -45,45 +45,41 @@ export function Wheel() {
     setSpinning(true)
 
     try {
-      const { tx } = await postSpin()
-      setPollKey(tx)
+      await postSpin() // webhook will handle winner
     } catch (e) {
       console.error(e)
       setSpinning(false)
     }
   }
 
-  // poll when pollKey is set
+  // Resolve spin when new winner arrives
+  const prevWinnerLen = useRef(winners.length)
   useEffect(() => {
-    if (!pollKey) return
-    const id = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/spin/${pollKey}`)
-        const data = await res.json()
-        if (data.status === 'ready') {
-          clearInterval(id)
-          setPollKey(null)
+    if (!spinning) {
+      prevWinnerLen.current = winners.length
+      return
+    }
+    if (winners.length <= prevWinnerLen.current) return
 
-          const winnerIdx = data.i as number
-          const rotations = 5 + Math.floor(Math.random() * 3)
-          const degreesPerSeg = 360 / SEGMENTS
-          const targetDeg = rotations * 360 + winnerIdx * degreesPerSeg + degreesPerSeg / 2
+    const lastWinner = winners[winners.length - 1]
+    const winnerIdx = slots.findIndex(s => s.address === lastWinner.address)
+    if (winnerIdx === -1) return // address not in current slots
 
-          await controls.start({ rotate: targetDeg, transition: { duration: 8, ease: 'easeOut' } })
-          recordWinner(winnerIdx)
-          setFlashIdx(winnerIdx)
-          // keep spinning true during flash
-          setTimeout(async () => {
-            // refresh entrants list
-            await fetch('/api/entrants')
-            setFlashIdx(null)
-            setSpinning(false)
-          }, 10000)
-        }
-      } catch {}
-    }, 2000)
-    return () => clearInterval(id)
-  }, [pollKey])
+    ;(async () => {
+      const rotations = 5 + Math.floor(Math.random() * 3)
+      const degreesPerSeg = 360 / SEGMENTS
+      const targetDeg = rotations * 360 + winnerIdx * degreesPerSeg + degreesPerSeg / 2
+
+      await controls.start({ rotate: targetDeg, transition: { duration: 8, ease: 'easeOut' } })
+      setFlashIdx(winnerIdx)
+      setTimeout(() => {
+        setFlashIdx(null)
+        setSpinning(false)
+      }, 10000)
+    })()
+
+    prevWinnerLen.current = winners.length
+  }, [winners])
 
   // register spin on mount
   useEffect(() => {
