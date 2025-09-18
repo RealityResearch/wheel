@@ -16,8 +16,10 @@ type Settings = typeof defaults
 export async function GET() {
   const raw = await redis.hgetall(KEY)
   const stored = raw as Record<string, string>
-  const settings: Settings = { ...defaults, ...stored, timerSec: Number(stored.timerSec ?? defaults.timerSec) }
-  const nextSpinTs = Number(await redis.get('nextSpinTs')) || Date.now() + settings.interval * 1000 || Date.now() + 180000
+  const timerSec = Number(stored.timerSec ?? defaults.timerSec)
+  const settings: Settings = { ...defaults, ...stored, timerSec }
+  const nextSpinTsRaw = await redis.get('nextSpinTs')
+  const nextSpinTs = nextSpinTsRaw ? Number(nextSpinTsRaw) : Date.now() + timerSec * 1000
   return NextResponse.json({ settings, nextSpinTs })
 }
 
