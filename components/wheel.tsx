@@ -3,7 +3,6 @@
 import { motion, useAnimationControls } from 'framer-motion'
 import { useRaffle } from '@/components/raffle-context'
 import { useEffect, useMemo, useState } from 'react'
-import { useState } from 'react'
 
 async function postSpin() {
   const res = await fetch('/api/spin', { method: 'POST' })

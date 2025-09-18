@@ -241,11 +241,9 @@ export function RaffleProvider({ children }: { children: React.ReactNode }) {
         addEntrant,
         setSettings,
         recordWinner,
-        reloadEntrants,
         autoSpin,
         interval: intervalSec,
         countdown,
-        // auto spin is fixed; no toggle or interval setter
         registerSpin,
         triggerSpin,
         spinning,
