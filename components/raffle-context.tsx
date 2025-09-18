@@ -217,6 +217,11 @@ export function RaffleProvider({ children }: { children: React.ReactNode }) {
     })
   }
 
+  // update global spin timestamp
+  function updateNextSpinTs(ts: number) {
+    setNextSpinTs(ts)
+  }
+
   // expose refresh for wheel
   async function reloadEntrants() {
     await refreshEntrants()
