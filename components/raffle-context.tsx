@@ -145,22 +145,30 @@ export function RaffleProvider({ children }: { children: React.ReactNode }) {
     })()
   }, [])
 
-  // polling for updates every 2s (simple)
-  useEffect(() => {
-    const id = setInterval(async () => {
-      try {
-        const { entrants } = await getJSON<{ entrants: string[] }>('/api/entrants')
-        setSlots(prev => {
-          const copy = [...prev]
-          entrants.slice(0, 50).forEach((addr, idx) => {
-            copy[idx] = { number: idx + 1, address: addr, color: FILLED_COLOR }
-          })
-          for (let i = entrants.length; i < 50; i++) copy[i] = { number: i + 1, address: null, color: null }
-          return copy
+  async function refreshEntrants() {
+    try {
+      const { entrants } = await getJSON<{ entrants: string[] }>('/api/entrants')
+      setSlots(prev => {
+        const copy = [...prev]
+        entrants.slice(0, 50).forEach((addr, idx) => {
+          copy[idx] = { number: idx + 1, address: addr, color: FILLED_COLOR }
         })
-        setWaitlist(entrants.slice(50))
-      } catch {}
-    }, 2000)
+        for (let i = entrants.length; i < 50 && i < copy.length; i++) {
+          copy[i] = { number: i + 1, address: null, color: null }
+        }
+        return copy
+      })
+      setWaitlist(entrants.slice(50))
+    } catch {}
+  }
+
+  // poll every 10s until wheel filled
+  useEffect(() => {
+    refreshEntrants() // initial call
+    const id = setInterval(() => {
+      const filled = slots.filter(s => s.address).length
+      if (filled < 50) refreshEntrants()
+    }, 10000)
     return () => clearInterval(id)
   }, [])
 
@@ -218,6 +226,11 @@ export function RaffleProvider({ children }: { children: React.ReactNode }) {
     })
   }
 
+  // expose refresh for wheel
+  async function reloadEntrants() {
+    await refreshEntrants()
+  }
+
   return (
     <RaffleContext.Provider
       value={{
@@ -228,6 +241,7 @@ export function RaffleProvider({ children }: { children: React.ReactNode }) {
         addEntrant,
         setSettings,
         recordWinner,
+        reloadEntrants,
         autoSpin,
         interval: intervalSec,
         countdown,

@@ -3,7 +3,8 @@
 import { NextResponse } from 'next/server'
 import { redis } from '@/lib/redis'
 
-const KEY = 'entrants:set'
+const LIST = 'entrants:list'
+const SET = 'entrants:set' // legacy
 
 // 50 sample Solana wallets (public keys) – dev only
 const SAMPLE_WALLETS = [
@@ -60,13 +61,23 @@ const SAMPLE_WALLETS = [
 ]
 
 export async function GET() {
-  // fetch entrants
-  const membersRaw = await redis.smembers(KEY)
-  let members = membersRaw as string[]
+  // migrate from set to list once
+  const len = await redis.llen(LIST)
+  if (len === 0) {
+    const legacy = await redis.smembers(SET)
+    if (legacy.length > 0) {
+      // sort to keep deterministic order
+      legacy.sort()
+      for (const addr of legacy) await redis.rpush(LIST, addr)
+      await redis.del(SET)
+    }
+  }
+
+  let members = (await redis.lrange(LIST, 0, -1)) as string[]
 
   // dev seed once if empty
   if (members.length === 0 && process.env.NODE_ENV !== 'production') {
-    for (const w of SAMPLE_WALLETS) await redis.sadd(KEY, w)
+    for (const w of SAMPLE_WALLETS) await redis.rpush(LIST, w)
     members = [...SAMPLE_WALLETS]
   }
 
@@ -84,8 +95,8 @@ export async function POST(req: Request) {
     const { address }: AddEntrantBody = await req.json()
     if (!address) return NextResponse.json({ error: 'Missing address' }, { status: 400 })
 
-    await redis.sadd(KEY, address)
-    const count = await redis.scard(KEY)
+    await redis.rpush(LIST, address)
+    const count = await redis.llen(LIST)
     return NextResponse.json({ ok: true, count })
   } catch {
     return NextResponse.json({ error: 'Bad request' }, { status: 400 })
@@ -93,6 +104,6 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE() {
-  await redis.del(KEY)
+  await redis.del(LIST)
   return NextResponse.json({ ok: true })
 }

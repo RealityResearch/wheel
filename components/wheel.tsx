@@ -2,7 +2,7 @@
 
 import { motion, useAnimationControls } from 'framer-motion'
 import { useRaffle } from '@/components/raffle-context'
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useState } from 'react'
 
 async function postSpin() {
@@ -35,6 +35,7 @@ const SEGMENTS = 50
 
 export function Wheel() {
   const { slots, recordWinner, registerSpin, setSpinning, spinning } = useRaffle()
+  const [flashIdx, setFlashIdx] = useState<number | null>(null)
   const controls = useAnimationControls()
 
   const [pollKey, setPollKey] = useState<string | null>(null)
@@ -69,9 +70,16 @@ export function Wheel() {
           const degreesPerSeg = 360 / SEGMENTS
           const targetDeg = rotations * 360 + winnerIdx * degreesPerSeg + degreesPerSeg / 2
 
-          await controls.start({ rotate: targetDeg, transition: { duration: 16, ease: 'easeOut' } })
+          await controls.start({ rotate: targetDeg, transition: { duration: 8, ease: 'easeOut' } })
           recordWinner(winnerIdx)
-          setSpinning(false)
+          setFlashIdx(winnerIdx)
+          // keep spinning true during flash
+          setTimeout(async () => {
+            // refresh entrants list
+            await fetch('/api/entrants')
+            setFlashIdx(null)
+            setSpinning(false)
+          }, 10000)
         }
       } catch {}
     }, 2000)
@@ -110,7 +118,9 @@ export function Wheel() {
             <path
               key={idx}
               d={d}
-              className={`${slots[idx].color ?? 'fill-white'} stroke-gray-200`}
+              className={`${
+                slots[idx].color ?? 'fill-white'
+              } stroke-gray-200 ${flashIdx === idx ? 'animate-pulse' : ''}`}
               strokeWidth={1}
             />
           ))}
