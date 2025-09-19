@@ -14,7 +14,7 @@ const SECRET = process.env.SB_ONDEMAND_SECRET as string
 async function getClient() {
   const kp   = Keypair.fromSecretKey(bs58.decode(SECRET))
   const conn = new Connection(RPC, { commitment: 'confirmed' })
-  return OnDemandClient.connect(conn, kp)
+  return new OnDemandClient(conn, kp)
 }
 
 export async function requestRandomness(webhook?: string) {
