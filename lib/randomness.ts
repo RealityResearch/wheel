@@ -1,21 +1,20 @@
+// lib/randomness.ts
 import { Keypair, Connection } from '@solana/web3.js'
-// dynamic import handles different export styles
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-// @ts-ignore
-const SB = require('@switchboard-xyz/on-demand')
-// resolve constructor regardless of export style
-// @ts-ignore
-const OnDemandClient = SB?.OnDemandClient || SB?.default || SB
 import bs58 from 'bs58'
 
-const RPC = process.env.SB_ONDEMAND_RPC!
-const SECRET = process.env.SB_ONDEMAND_SECRET!
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+// @ts-ignore – CJS
+const Switchboard = require('@switchboard-xyz/on-demand')
+// default export *is* the client
+const OnDemandClient = Switchboard.default ?? Switchboard
+
+const RPC    = process.env.SB_ONDEMAND_RPC as string
+const SECRET = process.env.SB_ONDEMAND_SECRET as string
 
 async function getClient() {
-  const keypair = Keypair.fromSecretKey(bs58.decode(SECRET))
-  const connection = new Connection(RPC, { commitment: 'confirmed' })
-  const client = await OnDemandClient.connect(connection, keypair)
-  return client
+  const kp   = Keypair.fromSecretKey(bs58.decode(SECRET))
+  const conn = new Connection(RPC, { commitment: 'confirmed' })
+  return OnDemandClient.connect(conn, kp)
 }
 
 export async function requestRandomness(webhook?: string) {
@@ -24,6 +23,6 @@ export async function requestRandomness(webhook?: string) {
 }
 
 export async function getRandomness(requestKey: string) {
-  const client = await OnDemandClient.connect(new Connection(RPC, 'confirmed'))
+  const client = await getClient()
   return client.getRandomness(requestKey)
 }
