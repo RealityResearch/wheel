@@ -15,6 +15,7 @@ export async function POST() {
 
     const webhook = process.env.SB_ONDEMAND_WEBHOOK
     const { requestKey, txSignature } = await requestRandomness(webhook)
+    console.log('requestRandomness ok', requestKey, txSignature)
 
     // schedule next spin timestamp
     const intervalSec = 180
@@ -25,6 +26,7 @@ export async function POST() {
 
     return NextResponse.json({ pending: true, requestKey, txSignature, nextSpinTs: Date.now() + intervalSec * 1000 })
   } catch (e) {
+    console.error('Spin route error', (e as Error).message)
     return NextResponse.json({ error: 'Randomness request failed' }, { status: 502 })
   }
 }
