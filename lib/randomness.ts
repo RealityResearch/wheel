@@ -1,8 +1,11 @@
 import { Keypair, Connection } from '@solana/web3.js'
-// Dynamic import to avoid TS export mismatch during build
+// dynamic import handles both v1 and v2 SDK structures
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 // @ts-ignore
-const { OnDemandClient } = require('@switchboard-xyz/on-demand')
+const Switchboard = require('@switchboard-xyz/on-demand')
+// v1: Switchboard.OnDemandClient, v2: Switchboard.default
+// @ts-ignore
+const OnDemandClient = Switchboard.OnDemandClient || Switchboard.default
 import bs58 from 'bs58'
 
 const RPC = process.env.SB_ONDEMAND_RPC!
