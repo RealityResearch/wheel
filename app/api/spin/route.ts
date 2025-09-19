@@ -2,7 +2,7 @@
 
 import { NextResponse } from 'next/server'
 import { redis } from '@/lib/redis'
-import { requestRandomness } from '@/lib/randomness'
+import { createCommitRandomness } from '@/lib/randomness'
 
 const ENTRANTS_KEY = 'entrants:list'
 const REQUEST_PREFIX = 'rod:req:'
@@ -13,18 +13,16 @@ export async function POST() {
     if (entrants.length === 0)
       return NextResponse.json({ error: 'No entrants' }, { status: 409 })
 
-    const webhook = process.env.SB_ONDEMAND_WEBHOOK
-    const { requestKey, txSignature } = await requestRandomness(webhook)
-    console.log('requestRandomness ok', requestKey, txSignature)
+    const { randomnessPubkey, sig } = await createCommitRandomness()
+    console.log('randomness commit', randomnessPubkey.toBase58(), sig)
 
     // schedule next spin timestamp
     const intervalSec = 180
     await redis.set('nextSpinTs', Date.now() + intervalSec * 1000)
 
-    // store meta for later lookup (TTL 10 min)
-    await redis.set(`${REQUEST_PREFIX}${requestKey}`, JSON.stringify({ txSignature }), { ex: 600 })
+    await redis.rpush('rand:pending', randomnessPubkey.toBase58())
 
-    return NextResponse.json({ pending: true, requestKey, txSignature, nextSpinTs: Date.now() + intervalSec * 1000 })
+    return NextResponse.json({ pending: true, randomnessPubkey: randomnessPubkey.toBase58(), commitSig: sig, nextSpinTs: Date.now() + intervalSec * 1000 })
   } catch (e) {
     console.error('Spin route error', (e as Error).message)
     return NextResponse.json({ error: 'Randomness request failed' }, { status: 502 })

@@ -1,0 +1,13 @@
+{
+  "crons": [
+    {
+      "path": "/api/spin/reveal",
+      "schedule": "*/10 * * * *"
+    }
+  ],
+  "functions": {
+    "api/**/route.ts": {
+      "runtime": "nodejs18.x"
+    }
+  }
+}

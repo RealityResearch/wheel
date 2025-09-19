@@ -17,7 +17,6 @@ export function WinnersTable() {
           <tr className="border-b text-left">
             <th className="py-1 pr-2">Round</th>
             <th className="py-1 pr-2">Wallet</th>
-            <th className="py-1 pr-2">Amt</th>
             <th className="py-1 pr-2">Time</th>
             <th className="py-1">Verify</th>
           </tr>
@@ -34,12 +33,11 @@ export function WinnersTable() {
               <tr key={w.round} className="border-b last:border-none">
                 <td className="py-1 pr-2">{w.round}</td>
                 <td className="py-1 pr-2 font-mono">{w.address}</td>
-                <td className="py-1 pr-2">{w.amount}</td>
                 <td className="py-1 pr-2 text-xs">{new Date(w.timestamp).toLocaleTimeString()}</td>
                 <td className="py-1 text-xs">
-                  {'vrfTx' in w && w.vrfTx ? (
+                  {'revealTx' in w && w.revealTx ? (
                     <a
-                      href={`https://explorer.solana.com/tx/${w.vrfTx}`}
+                      href={`https://explorer.solana.com/tx/${w.revealTx}`}
                       className="text-blue-600 hover:underline"
                       target="_blank"
                       rel="noreferrer"
